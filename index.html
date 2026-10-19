@@ -1,0 +1,1555 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Threshold Binaural</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#05060b">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed WebGL phase tunnel behind a one-screen instrument. Readout at the top, control deck docked at the bottom, tunnel gate centred in the space between. */
+:root {
+  --void: #05060b;
+  --deck: rgba(8, 9, 17, 0.8);
+  --deck-solid: #0a0b14;
+  --hair: rgba(208, 204, 255, 0.12);
+  --hair-strong: rgba(208, 204, 255, 0.26);
+  --text: #eeebf7;
+  --dim: #a6a3c1;
+  --faint: #75728f;
+  --left: #8fd6ff;
+  --right: #ffb995;
+  --left-a: rgba(143, 214, 255, 0.6);
+  --right-a: rgba(255, 185, 149, 0.6);
+  --glow: #f4ecff;
+  --glow-soft: rgba(244, 236, 255, 0.07);
+  --focus: rgba(244, 236, 255, 0.55);
+  --warn: #ffcf9e;
+  --f-display: "Cormorant Garamond", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+  --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+  color-scheme: dark;
+}
+html { box-sizing: border-box; height: 100%; background: var(--void); }
+*, *::before, *::after { box-sizing: inherit; }
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--void);
+  color: var(--text);
+  font-family: var(--f-body);
+  font-size: 14px;
+  line-height: 1.45;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+p { margin: 0; }
+
+#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
+.fallback-glow {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(40% 30% at 50% 42%, rgba(244, 236, 255, 0.16), transparent 70%),
+    radial-gradient(70% 50% at 35% 45%, rgba(143, 214, 255, 0.08), transparent 70%),
+    radial-gradient(70% 50% at 65% 45%, rgba(255, 185, 149, 0.07), transparent 70%);
+}
+.vignette {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(3, 3, 7, 0.75) 100%);
+}
+
+.app { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; }
+
+/* Header */
+.top {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding-left: var(--gutter-l); padding-right: var(--gutter-r); padding-block: 14px 0;
+  width: 100%; max-width: 560px; margin: 0 auto;
+}
+.mark { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.mark-name { font-family: var(--f-display); font-style: italic; font-weight: 400; font-size: 24px; letter-spacing: 0.01em; line-height: 1; }
+.mark-sub { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); white-space: nowrap; }
+.ghost-btn {
+  border: 1px solid var(--hair); background: rgba(5, 6, 11, 0.35); color: var(--dim);
+  font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.08em;
+  border-radius: 999px; padding: 7px 12px; min-height: 32px; white-space: nowrap;
+  transition: color .2s, border-color .2s;
+}
+.ghost-btn:hover { color: var(--text); border-color: var(--hair-strong); }
+
+/* Notice */
+.notice {
+  width: 100%; max-width: 560px; margin: 10px auto 0;
+  padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+}
+.notice-card {
+  display: flex; align-items: flex-start; gap: 10px;
+  border: 1px solid rgba(255, 207, 158, 0.28); background: rgba(30, 22, 14, 0.62);
+  border-radius: 14px; padding: 10px 10px 10px 14px; color: var(--warn); font-size: 13px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.notice-card p { flex: 1; min-width: 0; }
+.notice-x { border: 0; background: transparent; color: var(--warn); font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 8px; }
+
+/* Readout */
+.readout {
+  width: 100%; max-width: 560px; margin: 0 auto;
+  padding-left: var(--gutter-l); padding-right: var(--gutter-r); padding-block: 18px 0;
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px;
+  pointer-events: none;
+}
+.band { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.band-name { font-family: var(--f-display); font-style: italic; font-weight: 300; font-size: 26px; line-height: 1.1; letter-spacing: 0.01em; }
+.band-note { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); }
+.beat {
+  display: flex; align-items: baseline; justify-content: center; gap: 8px;
+  font-family: var(--f-display); font-weight: 300; line-height: 0.95;
+  font-size: clamp(76px, 22vw, 124px); letter-spacing: -0.01em;
+  font-variant-numeric: lining-nums tabular-nums;
+  text-shadow: 0 0 40px rgba(244, 236, 255, 0.18);
+}
+.beat-unit { font-family: var(--f-mono); font-size: 14px; letter-spacing: 0.12em; color: var(--dim); font-weight: 400; text-shadow: none; }
+.ears { display: flex; gap: 14px; font-family: var(--f-mono); font-size: 11.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.ears b { font-weight: 500; color: var(--text); }
+.ear { display: inline-flex; align-items: center; gap: 6px; }
+.ear::before { content: ""; width: 6px; height: 6px; border-radius: 50%; }
+.ear-l::before { background: var(--left); box-shadow: 0 0 10px var(--left); }
+.ear-r::before { background: var(--right); box-shadow: 0 0 10px var(--right); }
+.glide-now { margin-top: 6px; font-family: var(--f-mono); font-size: 10.5px; letter-spacing: 0.08em; color: var(--faint); }
+
+.spacer { flex: 1 1 auto; min-height: 24px; }
+
+/* Deck */
+.deck {
+  position: relative; width: 100%;
+  background: var(--deck);
+  border-top: 1px solid var(--hair);
+  backdrop-filter: blur(18px) saturate(115%); -webkit-backdrop-filter: blur(18px) saturate(115%);
+  max-height: calc(100% - 150px); display: flex;
+}
+.deck::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 64px; background: var(--deck-solid); }
+.deck-inner {
+  width: 100%; max-width: 560px; margin: 0 auto; overflow-y: auto; overscroll-behavior: contain;
+  padding-left: var(--gutter-l); padding-right: var(--gutter-r); padding-block: 14px 12px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.controls { display: flex; flex-direction: column; gap: 10px; }
+.app[data-state="playing"]:not([data-adjust="1"]) .controls,
+.app[data-state="paused"]:not([data-adjust="1"]) .controls,
+.app[data-state="preparing"]:not([data-adjust="1"]) .controls { display: none; }
+
+.presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.preset {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  border: 1px solid var(--hair); background: transparent; border-radius: 14px;
+  padding: 8px 4px 7px; min-height: 56px; transition: border-color .2s, background .2s;
+}
+.preset .pv { font-family: var(--f-mono); font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.preset .pn { font-family: var(--f-display); font-style: italic; font-size: 15px; color: var(--dim); line-height: 1.1; }
+.preset[aria-pressed="true"] {
+  border-color: transparent;
+  background:
+    linear-gradient(var(--deck-solid), var(--deck-solid)) padding-box,
+    linear-gradient(100deg, var(--left), var(--glow) 50%, var(--right)) border-box;
+}
+.preset[aria-pressed="true"] .pn { color: var(--text); }
+
+.row { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 40px; }
+.lbl { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); }
+.val { font-family: var(--f-mono); font-size: 12.5px; color: var(--text); font-variant-numeric: tabular-nums; min-width: 58px; text-align: right; }
+.val-dim { color: var(--dim); }
+.slider-wrap { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.step {
+  flex: none; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--hair);
+  background: transparent; color: var(--dim); font-family: var(--f-mono); font-size: 15px; line-height: 1;
+}
+.step:hover { color: var(--text); border-color: var(--hair-strong); }
+
+input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; min-width: 0; height: 30px; background: transparent; margin: 0; touch-action: pan-y; }
+input[type="range"]::-webkit-slider-runnable-track { height: 2px; border-radius: 2px; background: var(--hair-strong); }
+input[type="range"]::-moz-range-track { height: 2px; border-radius: 2px; background: var(--hair-strong); }
+input[type="range"].tone-track::-webkit-slider-runnable-track { background: linear-gradient(90deg, var(--left-a), var(--right-a)); }
+input[type="range"].tone-track::-moz-range-track { background: linear-gradient(90deg, var(--left-a), var(--right-a)); }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 20px; height: 20px; margin-top: -9px; border-radius: 50%;
+  background: var(--void); border: 1.5px solid var(--glow); box-shadow: 0 0 14px rgba(244, 236, 255, 0.3);
+}
+input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--void); border: 1.5px solid var(--glow); box-shadow: 0 0 14px rgba(244, 236, 255, 0.3); }
+input[type="range"]:focus { outline: none; }
+input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px var(--focus); }
+input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px var(--focus); }
+
+.seg { display: flex; gap: 4px; min-width: 0; }
+.seg button {
+  flex: 1 1 0; min-width: 0; min-height: 34px; border-radius: 10px; border: 1px solid transparent;
+  background: transparent; color: var(--dim); font-family: var(--f-mono); font-size: 12.5px; font-variant-numeric: tabular-nums;
+  padding: 0 2px; transition: color .2s, border-color .2s, background .2s;
+}
+.seg button:hover { color: var(--text); }
+.seg button[aria-checked="true"] { color: var(--text); border-color: var(--hair-strong); background: var(--glow-soft); }
+
+.more { border-top: 1px solid var(--hair); }
+.more summary {
+  list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  min-height: 42px; cursor: pointer; color: var(--dim);
+}
+.more summary::-webkit-details-marker { display: none; }
+.more summary .lbl { color: var(--dim); }
+.more-sum { font-family: var(--f-mono); font-size: 11px; color: var(--faint); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+.more-sum::after { content: "+"; font-size: 15px; color: var(--dim); }
+.more[open] .more-sum::after { content: "−"; }
+.more-body { display: flex; flex-direction: column; gap: 6px; padding-bottom: 6px; }
+
+.toggle-row { grid-template-columns: minmax(0, 1fr) auto; padding-block: 4px; }
+.toggle-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.toggle-title { font-size: 13.5px; color: var(--text); }
+.toggle-sub { font-size: 12px; color: var(--faint); }
+.switch { position: relative; width: 44px; height: 26px; flex: none; }
+.switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.switch span { position: absolute; inset: 0; border-radius: 999px; border: 1px solid var(--hair-strong); background: transparent; transition: background .2s, border-color .2s; pointer-events: none; }
+.switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--dim); transition: transform .2s, background .2s; }
+.switch input:checked + span { background: linear-gradient(90deg, rgba(143, 214, 255, 0.25), rgba(255, 185, 149, 0.25)); border-color: transparent; }
+.switch input:checked + span::after { transform: translateX(18px); background: var(--glow); }
+.switch input:focus-visible + span { box-shadow: 0 0 0 3px var(--focus); }
+.switch input:disabled + span { opacity: 0.35; }
+.toggle-row.is-off .toggle-title { color: var(--faint); }
+
+/* Transport */
+.transport { display: flex; align-items: center; gap: 14px; }
+.play {
+  position: relative; flex: none; width: 74px; height: 74px; border-radius: 50%; border: 0; padding: 0;
+  background: radial-gradient(circle at 50% 38%, rgba(244, 236, 255, 0.16), rgba(244, 236, 255, 0.03) 68%);
+  color: var(--glow); display: grid; place-items: center;
+}
+.play .ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring-track { fill: none; stroke: var(--hair-strong); stroke-width: 1.2; }
+.ring-prog { fill: none; stroke: url(#ringGrad); stroke-width: 2.4; stroke-linecap: round; transition: stroke-dashoffset .4s linear; }
+.play .icon { width: 24px; height: 24px; position: relative; }
+.play .icon-pause, .play .icon-wait { display: none; }
+.app[data-state="playing"] .play .icon-play { display: none; }
+.app[data-state="playing"] .play .icon-pause { display: block; }
+.app[data-state="preparing"] .play .icon-play { display: none; }
+.app[data-state="preparing"] .play .icon-wait { display: block; }
+.play:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus); }
+.app[data-state="preparing"] .ring-prog { animation: breathe 1.6s ease-in-out infinite; }
+@keyframes breathe { 50% { opacity: 0.45; } }
+.status { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.status-main { font-family: var(--f-mono); font-size: 15px; font-variant-numeric: tabular-nums; color: var(--text); }
+.status-sub { font-size: 12.5px; color: var(--dim); }
+.transport-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
+
+/* Sheet */
+.sheet-backdrop {
+  position: fixed; inset: 0; z-index: 5; background: rgba(3, 3, 8, 0.6);
+  display: flex; align-items: flex-end; justify-content: center;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.sheet {
+  width: 100%; max-width: 560px; max-height: 86%; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--deck-solid); border: 1px solid var(--hair); border-bottom: 0; border-radius: 22px 22px 0 0;
+  padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+  padding-top: 20px; padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 14px;
+}
+.sheet h2 { margin: 0; font-family: var(--f-display); font-style: italic; font-weight: 400; font-size: 28px; line-height: 1.1; text-wrap: balance; }
+.sheet h3 { margin: 0 0 4px; font-family: var(--f-mono); font-weight: 500; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); }
+.sheet p { color: var(--dim); max-width: 62ch; }
+.sheet p b { color: var(--text); font-weight: 500; }
+.sheet .diag { font-family: var(--f-mono); font-size: 11px; color: var(--faint); }
+.sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.sheet-head h2 { min-width: 0; }
+.wave-key { display: flex; gap: 14px; font-family: var(--f-mono); font-size: 11px; color: var(--dim); }
+
+@media (min-width: 720px) {
+  .deck { border: 1px solid var(--hair); border-bottom: 0; border-radius: 22px 22px 0 0; width: min(560px, 100%); margin: 0 auto; }
+  .deck-inner { padding-left: 18px; padding-right: 18px; }
+}
+@media (max-height: 640px) {
+  .readout { padding-block: 6px 0; }
+  .beat { font-size: clamp(60px, 16vw, 96px); }
+  .band-note { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ring-prog { transition: none; }
+  .app[data-state="preparing"] .ring-prog { animation: none; }
+}
+</style>
+
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="fallback-glow" id="fallbackGlow" aria-hidden="true" hidden></div>
+<div class="vignette" aria-hidden="true"></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8fd6ff"/>
+      <stop offset="0.5" stop-color="#f4ecff"/>
+      <stop offset="1" stop-color="#ffb995"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<div class="app" id="app" data-state="idle">
+  <header class="top">
+    <div class="mark">
+      <span class="mark-name">Threshold</span>
+      <span class="mark-sub">binaural beats</span>
+    </div>
+    <button class="ghost-btn" id="infoBtn" type="button" aria-haspopup="dialog" aria-controls="sheet">How it works</button>
+  </header>
+
+  <div class="notice" id="notice" hidden>
+    <div class="notice-card" role="status">
+      <p id="noticeText"></p>
+      <button type="button" class="notice-x" id="noticeClose" aria-label="Dismiss notice">×</button>
+    </div>
+  </div>
+
+  <section class="readout" id="readout" aria-label="Current beat">
+    <div class="band"><span class="band-name" id="bandName">Theta</span><span class="band-note" id="bandNote">the hypnagogic edge</span></div>
+    <p class="beat"><span id="beatNow">6.3</span><span class="beat-unit">Hz</span></p>
+    <p class="ears"><span class="ear ear-l">L <b id="fL">196.85</b></span><span class="ear ear-r">R <b id="fR">203.15</b></span></p>
+    <p class="glide-now" id="glideNow" hidden></p>
+  </section>
+
+  <div class="spacer" id="gateSpace"></div>
+
+  <section class="deck" id="deck" aria-label="Session controls">
+    <div class="deck-inner">
+      <div class="controls" id="controls">
+        <div class="presets" role="group" aria-label="Presets">
+          <button type="button" class="preset" data-beat="2.5" aria-pressed="false"><span class="pv">2.5</span><span class="pn">delta</span></button>
+          <button type="button" class="preset" data-beat="4.5" aria-pressed="false"><span class="pv">4.5</span><span class="pn">deep theta</span></button>
+          <button type="button" class="preset" data-beat="6.3" aria-pressed="true"><span class="pv">6.3</span><span class="pn">theta</span></button>
+          <button type="button" class="preset" data-beat="10" aria-pressed="false"><span class="pv">10</span><span class="pn">alpha</span></button>
+        </div>
+
+        <div class="row">
+          <label class="lbl" for="beatRange">Beat</label>
+          <div class="slider-wrap">
+            <button type="button" class="step" id="beatDown" aria-label="Lower the beat by 0.1 hertz">−</button>
+            <input id="beatRange" class="tone-track" type="range" min="0" max="1000" step="1" value="604" aria-valuetext="6.3 hertz">
+            <button type="button" class="step" id="beatUp" aria-label="Raise the beat by 0.1 hertz">+</button>
+          </div>
+          <output class="val" id="beatOut" for="beatRange">6.3 Hz</output>
+        </div>
+
+        <div class="row">
+          <span class="lbl" id="lenLbl">Session</span>
+          <div class="seg" role="radiogroup" aria-labelledby="lenLbl" id="lenSeg">
+            <button type="button" role="radio" data-min="20" aria-checked="false">20</button>
+            <button type="button" role="radio" data-min="30" aria-checked="true">30</button>
+            <button type="button" role="radio" data-min="45" aria-checked="false">45</button>
+            <button type="button" role="radio" data-min="60" aria-checked="false">60</button>
+            <button type="button" role="radio" data-min="90" aria-checked="false">90</button>
+          </div>
+          <span class="val val-dim">min</span>
+        </div>
+
+        <details class="more" id="more">
+          <summary><span class="lbl">Sound</span><span class="more-sum" id="moreSum">200 Hz tone · surf · glide</span></summary>
+          <div class="more-body">
+            <div class="row">
+              <label class="lbl" for="carrierRange">Tone</label>
+              <input id="carrierRange" type="range" min="80" max="500" step="1" value="200" aria-valuetext="200 hertz">
+              <output class="val" id="carrierOut" for="carrierRange">200 Hz</output>
+            </div>
+            <div class="row">
+              <span class="lbl" id="bedLbl">Bed</span>
+              <div class="seg" role="radiogroup" aria-labelledby="bedLbl" id="bedSeg">
+                <button type="button" role="radio" data-bed="off" aria-checked="false">off</button>
+                <button type="button" role="radio" data-bed="pink" aria-checked="false">pink</button>
+                <button type="button" role="radio" data-bed="brown" aria-checked="false">brown</button>
+                <button type="button" role="radio" data-bed="surf" aria-checked="true">surf</button>
+              </div>
+              <span class="val val-dim" aria-hidden="true"></span>
+            </div>
+            <div class="row" id="levelRow">
+              <label class="lbl" for="levelRange">Level</label>
+              <input id="levelRange" type="range" min="0" max="100" step="1" value="55" aria-valuetext="55 percent">
+              <output class="val" id="levelOut" for="levelRange">55%</output>
+            </div>
+            <div class="row toggle-row" id="glideRow">
+              <div class="toggle-text">
+                <label class="toggle-title" for="glideToggle">Glide in from 10 Hz</label>
+                <span class="toggle-sub" id="glideSub">Starts at alpha and eases down over the first 10 min</span>
+              </div>
+              <span class="switch"><input id="glideToggle" type="checkbox" checked><span aria-hidden="true"></span></span>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div class="transport">
+        <button type="button" class="play" id="playBtn" aria-label="Start session">
+          <svg class="ring" viewBox="0 0 76 76" aria-hidden="true">
+            <circle class="ring-track" cx="38" cy="38" r="36"></circle>
+            <circle class="ring-prog" id="ringProg" cx="38" cy="38" r="36" stroke-dasharray="226.19" stroke-dashoffset="226.19"></circle>
+          </svg>
+          <svg class="icon icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>
+          <svg class="icon icon-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 5.5h3v13h-3zM13.5 5.5h3v13h-3z" fill="currentColor"/></svg>
+          <svg class="icon icon-wait" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="18" cy="12" r="1.6" fill="currentColor"/></svg>
+        </button>
+        <div class="status">
+          <p class="status-main" id="statusMain">30 min · ready</p>
+          <p class="status-sub" id="statusSub">Headphones on. Press play, then lock your phone.</p>
+          <span class="visually-hidden" id="liveStatus" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"></span>
+        </div>
+        <div class="transport-side">
+          <button type="button" class="ghost-btn" id="adjustBtn" hidden aria-expanded="false">Adjust</button>
+          <button type="button" class="ghost-btn" id="stopBtn" hidden>End</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="sheet-backdrop" id="sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet-head">
+      <h2 id="sheetTitle">Two tones, one beat</h2>
+      <button type="button" class="ghost-btn" id="sheetClose">Close</button>
+    </div>
+    <div class="wave-key"><span class="ear ear-l">left ear</span><span class="ear ear-r">right ear</span></div>
+    <p>Each ear gets its own pure tone. They differ by a few hertz, and your brain hears that difference as a slow pulse: the beat. Headphones are required, since speakers mix the two tones in the air.</p>
+    <div>
+      <h3>With the phone locked</h3>
+      <p>Press play, then lock your phone. The sound keeps going, fades in over the first 20 seconds and fades out on its own when the session ends. Pause and resume from the lock screen. Use Safari or Chrome. If you opened this page inside another app and the sound stops when you lock, open it in your browser instead.</p>
+    </div>
+    <div>
+      <h3>Before you start</h3>
+      <p>Turn off <b>spatial audio</b> or <b>Spatialize Stereo</b> for your headphones, so each ear hears only its own tone. Keep the volume low; the beat works at a quiet, comfortable level.</p>
+    </div>
+    <div>
+      <h3>The visual</h3>
+      <p>Each ring plots the left tone against the right. As their phase drifts, a circle flattens into a line and opens again. More rings per turn of the tunnel means a faster beat.</p>
+    </div>
+    <div>
+      <h3>Care</h3>
+      <p>Don't listen while driving. If you have epilepsy or a heart condition, check with a doctor first.</p>
+    </div>
+    <p class="diag" id="diag">Playback: checking…</p>
+  </div>
+</div>
+
+<audio id="player" preload="auto" title="Threshold"></audio>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ---------- Synth core (also runs inside the render worker) ---------- */
+function makeBedTile(kind, sr, seconds, seed) {
+  const N = Math.round(seconds * sr), X = Math.round(2 * sr), M = N + X;
+  let s = (seed >>> 0) || 0x9e3779b9;
+  let p0 = 0, p1 = 0, p2 = 0, p3 = 0, p4 = 0, p5 = 0, p6 = 0, b = 0, h = 0;
+  const pink = new Float32Array(M), brown = new Float32Array(M);
+  for (let i = -sr * 3; i < M; i++) {
+    s ^= s << 13; s ^= s >>> 17; s ^= s << 5;
+    const w = (s | 0) * 4.656612873077393e-10;
+    p0 = 0.99886 * p0 + w * 0.0555179; p1 = 0.99332 * p1 + w * 0.0750759; p2 = 0.969 * p2 + w * 0.153852;
+    p3 = 0.8665 * p3 + w * 0.3104856; p4 = 0.55 * p4 + w * 0.5329522; p5 = -0.7616 * p5 - w * 0.016898;
+    const pk = p0 + p1 + p2 + p3 + p4 + p5 + p6 + w * 0.5362; p6 = w * 0.115926;
+    const nb = b * 0.9965 + w * 0.06; h = nb - b + 0.9945 * h; b = nb;
+    if (i >= 0) { pink[i] = pk; brown[i] = h; }
+  }
+  const rms = a => { let q = 0; for (let i = 0; i < a.length; i++) q += a[i] * a[i]; return Math.sqrt(q / a.length) || 1; };
+  const kp = 1 / rms(pink), kb = 1 / rms(brown);
+  const src = new Float32Array(M);
+  for (let i = 0; i < M; i++) {
+    const vp = pink[i] * kp, vb = brown[i] * kb;
+    src[i] = kind === 'pink' ? vp : kind === 'brown' ? vb : 0.55 * vp + 0.84 * vb;
+  }
+  const tile = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    if (i < X) { const u = (i + 0.5) / X; tile[i] = src[i] * Math.sin(0.5 * Math.PI * u) + src[N + i] * Math.cos(0.5 * Math.PI * u); }
+    else tile[i] = src[i];
+  }
+  const k = 1 / rms(tile);
+  for (let i = 0; i < N; i++) tile[i] *= k;
+  return tile;
+}
+
+function* synthGen(p) {
+  const sr = p.sr, TAU = 6.283185307179586, BLOCK = 128;
+  const n0 = Math.round(p.t0 * sr), n1 = Math.round(p.t1 * sr);
+  const total = Math.max(0, n1 - n0);
+  const chunkFrames = Math.max(BLOCK, Math.round((p.chunkSec || 15) * sr / BLOCK) * BLOCK);
+  const A = p.toneAmp, D = p.dur, b = p.beat, c = p.carrier;
+  const gOn = !!p.glide && p.glideFrom > b, G = p.glideDur, dB = gOn ? p.glideFrom - b : 0;
+  const fadeIn = p.t0 > 0 ? p.entryFade : p.fadeIn, fadeOut = p.fadeOut;
+  const mode = p.bed === 'pink' ? 1 : p.bed === 'brown' ? 2 : p.bed === 'surf' ? 3 : 0;
+  const bedGain = mode ? p.bedLevel * p.bedMax * (mode === 3 ? p.surfNorm : 1) : 0;
+  const tile = mode ? makeBedTile(p.bed, sr, p.tileSec || 61, p.seed) : null;
+  const TN = tile ? tile.length : 1;
+  let iL = n0 % TN, iR = (n0 + (TN >> 1)) % TN;
+  const lim = 0.9;
+  function beatAt(t) { return gOn && t < G ? b + dB * (0.5 + 0.5 * Math.cos(Math.PI * t / G)) : b; }
+  function psiAt(t) {
+    let v = b * t;
+    if (gOn) { const u = t < G ? t : G; v += dB * (0.5 * u + (G / TAU) * Math.sin(Math.PI * u / G)); }
+    return TAU * v;
+  }
+  function env(t) {
+    let g = 1;
+    const a = (t - p.t0) / fadeIn;
+    if (a < 1) g *= a <= 0 ? 0 : 0.5 - 0.5 * Math.cos(Math.PI * a);
+    const r = (D - t) / fadeOut;
+    if (r < 1) g *= r <= 0 ? 0 : 0.5 - 0.5 * Math.cos(Math.PI * r);
+    return g;
+  }
+  let sW = ((p.seed >>> 0) ^ 0x2545f491) || 0x2545f491, wu = 0.3, wP = 9, wH = 0.85, wE = 0.3, pan = 0, lpl = 0, lpr = 0;
+  function rnd01() { sW ^= sW << 13; sW ^= sW >>> 17; sW ^= sW << 5; return (sW >>> 0) / 4294967296; }
+  for (let c0 = 0; c0 < total; c0 += chunkFrames) {
+    const nF = Math.min(chunkFrames, total - c0);
+    const out = new Int16Array(nF * 2);
+    for (let b0 = 0; b0 < nF; b0 += BLOCK) {
+      const bn = Math.min(BLOCK, nF - b0);
+      const n = n0 + c0 + b0;
+      const t = n / sr, tEnd = (n + bn) / sr, tMid = (n + bn * 0.5) / sr;
+      const psi = psiAt(t), base = TAU * c * t;
+      const phL = base - psi * 0.5, phR = base + psi * 0.5;
+      const bm = beatAt(tMid);
+      const dL = TAU * (c - bm * 0.5) / sr, dR = TAU * (c + bm * 0.5) / sr;
+      let cL = Math.cos(phL), sL = Math.sin(phL), cR = Math.cos(phR), sR = Math.sin(phR);
+      const cdL = Math.cos(dL), sdL = Math.sin(dL), cdR = Math.cos(dR), sdR = Math.sin(dR);
+      const g0 = env(t), g1 = env(tEnd), gStep = (g1 - g0) / bn;
+      let nL0 = bedGain, nL1 = bedGain, nR0 = bedGain, nR1 = bedGain, lpA = 1;
+      if (mode === 3) {
+        const bd = bn / sr, prev = wE, panPrev = pan;
+        wu += bd / wP;
+        if (wu >= 1) { wu -= 1; wP = 6.5 + rnd01() * 6; wH = 0.62 + rnd01() * 0.38; }
+        const shape = wu < 0.55 ? Math.pow(Math.sin(0.5 * Math.PI * wu / 0.55), 2) : Math.exp(-(wu - 0.55) * 6);
+        wE += (0.16 + 0.84 * shape * wH - wE) * (1 - Math.exp(-bd / 0.25));
+        pan += bd * TAU * 0.031;
+        const pp = 0.18 * Math.sin(panPrev), pn = 0.18 * Math.sin(pan);
+        nL0 = bedGain * prev * (1 + pp); nL1 = bedGain * wE * (1 + pn);
+        nR0 = bedGain * prev * (1 - pp); nR1 = bedGain * wE * (1 - pn);
+        lpA = 1 - Math.exp(-TAU * (300 + 2000 * wE) / sr);
+      }
+      const nsL = (nL1 - nL0) / bn, nsR = (nR1 - nR0) / bn;
+      let g = g0, nl = nL0, nr = nR0, o = b0 * 2;
+      for (let i = 0; i < bn; i++) {
+        let l = sL * A, r = sR * A;
+        const tc = cL * cdL - sL * sdL; sL = sL * cdL + cL * sdL; cL = tc;
+        const td = cR * cdR - sR * sdR; sR = sR * cdR + cR * sdR; cR = td;
+        if (mode) {
+          let xl = tile[iL], xr = tile[iR];
+          if (++iL === TN) iL = 0;
+          if (++iR === TN) iR = 0;
+          if (mode === 3) { lpl += lpA * (xl - lpl); lpr += lpA * (xr - lpr); xl = lpl; xr = lpr; }
+          l += xl * nl; r += xr * nr; nl += nsL; nr += nsR;
+        }
+        l *= g; r *= g; g += gStep;
+        if (l > lim) l = lim + 0.1 * Math.tanh((l - lim) * 10); else if (l < -lim) l = -lim - 0.1 * Math.tanh((-l - lim) * 10);
+        if (r > lim) r = lim + 0.1 * Math.tanh((r - lim) * 10); else if (r < -lim) r = -lim - 0.1 * Math.tanh((-r - lim) * 10);
+        const ql = l * 32767, qr = r * 32767;
+        out[o++] = ql < 0 ? (ql - 0.5) | 0 : (ql + 0.5) | 0;
+        out[o++] = qr < 0 ? (qr - 0.5) | 0 : (qr + 0.5) | 0;
+      }
+    }
+    yield { data: out, done: c0 + nF, total };
+  }
+}
+
+function wavHeader(frames, sr) {
+  const dataBytes = frames * 4, buf = new ArrayBuffer(44), v = new DataView(buf);
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + dataBytes, true); w(8, 'WAVE'); w(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 2, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 4, true); v.setUint16(32, 4, true); v.setUint16(34, 16, true);
+  w(36, 'data'); v.setUint32(40, dataBytes, true);
+  return buf;
+}
+</script>
+<script>
+(() => {
+  'use strict';
+  /* ---------- Settings ---------- */
+  const SR = 8000;
+  const CFG = { toneAmp: 0.26, fadeIn: 20, fadeOut: 45, entryFade: 1.2, bedMax: 0.14, surfNorm: 1.6, glideFrom: 10, tileSec: 61, chunkSec: 15 };
+  const LENGTHS = [20, 30, 45, 60, 90];
+  const BEDS = ['off', 'pink', 'brown', 'surf'];
+  const DEFAULTS = { beat: 6.3, carrier: 200, minutes: 30, bed: 'surf', bedLevel: 0.55, glide: true };
+  const KEY = 'threshold.v1';
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const num = (v, d) => (typeof v === 'number' && isFinite(v) ? v : d);
+
+  function loadSettings() {
+    let raw = null;
+    try { raw = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { raw = null; }
+    const s = Object.assign({}, DEFAULTS);
+    if (raw && typeof raw === 'object') {
+      s.beat = clamp(Math.round(num(raw.beat, s.beat) * 10) / 10, 0.5, 40);
+      s.carrier = clamp(Math.round(num(raw.carrier, s.carrier)), 80, 500);
+      s.minutes = LENGTHS.includes(raw.minutes) ? raw.minutes : s.minutes;
+      s.bed = BEDS.includes(raw.bed) ? raw.bed : s.bed;
+      s.bedLevel = clamp(num(raw.bedLevel, s.bedLevel), 0, 1);
+      s.glide = typeof raw.glide === 'boolean' ? raw.glide : s.glide;
+    }
+    return s;
+  }
+  const S = loadSettings();
+  function saveSettings() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* storage unavailable */ } }
+
+  const glideOn = () => S.glide && S.beat < CFG.glideFrom - 0.5;
+  const glideDur = D => Math.min(600, D / 3);
+  const carrierFor = (c, beat) => Math.max(c, beat / 2 + 30);
+
+  function sessionParams(t0) {
+    const D = S.minutes * 60;
+    return {
+      sr: SR, dur: D, t0, t1: D, carrier: carrierFor(S.carrier, S.beat), beat: S.beat,
+      glide: glideOn(), glideFrom: CFG.glideFrom, glideDur: glideDur(D),
+      bed: S.bed, bedLevel: S.bedLevel, bedMax: CFG.bedMax, surfNorm: CFG.surfNorm,
+      toneAmp: CFG.toneAmp, fadeIn: CFG.fadeIn, fadeOut: CFG.fadeOut, entryFade: CFG.entryFade,
+      seed: 0x5eed1234, chunkSec: CFG.chunkSec, tileSec: CFG.tileSec,
+    };
+  }
+  const keyOf = p => [p.dur, p.t0.toFixed(2), p.carrier, p.beat, p.glide ? 1 : 0, p.bed, p.bedLevel.toFixed(3)].join('|');
+
+  // Same closed forms as the synth, for the readout and the visual.
+  function beatAtT(t, p) {
+    const gOn = p.glide && p.glideFrom > p.beat;
+    return gOn && t < p.glideDur ? p.beat + (p.glideFrom - p.beat) * (0.5 + 0.5 * Math.cos(Math.PI * t / p.glideDur)) : p.beat;
+  }
+  function psiAtT(t, p) {
+    const TAU = Math.PI * 2, gOn = p.glide && p.glideFrom > p.beat;
+    let v = p.beat * t;
+    if (gOn) { const G = p.glideDur, u = Math.min(t, G); v += (p.glideFrom - p.beat) * (0.5 * u + (G / TAU) * Math.sin(Math.PI * u / G)); }
+    return TAU * v;
+  }
+  function envAtT(t, p, t0) {
+    let g = 1;
+    const fi = t0 > 0 ? p.entryFade : p.fadeIn;
+    const a = (t - t0) / fi; if (a < 1) g *= a <= 0 ? 0 : 0.5 - 0.5 * Math.cos(Math.PI * a);
+    const r = (p.dur - t) / p.fadeOut; if (r < 1) g *= r <= 0 ? 0 : 0.5 - 0.5 * Math.cos(Math.PI * r);
+    return g;
+  }
+
+  /* ---------- Formatting ---------- */
+  const fmtBeat = v => { const r = Math.round(v * 10) / 10; return r >= 10 && r % 1 === 0 ? String(r) : r.toFixed(1); };
+  const fmtClock = s => { s = Math.max(0, Math.round(s)); const m = Math.floor(s / 60), r = s % 60; return m + ':' + String(r).padStart(2, '0'); };
+  function bandOf(f) {
+    if (f < 4) return ['Delta', 'deep sleep'];
+    if (f < 8) return ['Theta', 'the hypnagogic edge'];
+    if (f < 13) return ['Alpha', 'relaxed, eyes closed'];
+    if (f < 30) return ['Beta', 'alert focus'];
+    return ['Gamma', 'fast focus'];
+  }
+  const toSlider = f => Math.round(1000 * Math.log(f / 0.5) / Math.log(80));
+  const fromSlider = v => clamp(Math.round(0.5 * Math.pow(80, v / 1000) * 10) / 10, 0.5, 40);
+
+  /* ---------- Elements ---------- */
+  const $ = id => document.getElementById(id);
+  const app = $('app'), player = $('player');
+  const el = {
+    bandName: $('bandName'), bandNote: $('bandNote'), beatNow: $('beatNow'), fL: $('fL'), fR: $('fR'), glideNow: $('glideNow'),
+    beatRange: $('beatRange'), beatOut: $('beatOut'), beatDown: $('beatDown'), beatUp: $('beatUp'),
+    lenSeg: $('lenSeg'), bedSeg: $('bedSeg'), carrierRange: $('carrierRange'), carrierOut: $('carrierOut'),
+    levelRange: $('levelRange'), levelOut: $('levelOut'), levelRow: $('levelRow'), glideToggle: $('glideToggle'),
+    glideRow: $('glideRow'), glideSub: $('glideSub'), moreSum: $('moreSum'),
+    playBtn: $('playBtn'), ringProg: $('ringProg'), statusMain: $('statusMain'), statusSub: $('statusSub'), live: $('liveStatus'),
+    adjustBtn: $('adjustBtn'), stopBtn: $('stopBtn'), notice: $('notice'), noticeText: $('noticeText'), noticeClose: $('noticeClose'),
+    sheet: $('sheet'), infoBtn: $('infoBtn'), sheetClose: $('sheetClose'), diag: $('diag'), deck: $('deck'), readout: $('readout'),
+    gateSpace: $('gateSpace'),
+  };
+  const presets = Array.from(document.querySelectorAll('.preset'));
+  const RING_LEN = 2 * Math.PI * 36;
+
+  /* ---------- Engine state ---------- */
+  const M = {
+    state: 'idle',        // idle | preparing | playing | paused | ended
+    mode: 'blob',         // blob | data | webaudio
+    probe: 'pending',     // pending | ok | unknown
+    active: null,         // render currently loaded in the element
+    startKey: null,       // render the pending start is waiting for
+    applyKey: null,       // render a mid-session change is waiting for
+    applying: false,
+    switching: false,
+    attempt: 0,
+    escalated: null,
+    error: '',
+    hint: '',
+  };
+  const R = { job: null, ready: null };
+
+  /* ---------- Silent clip used to unlock the audio element inside the first tap ---------- */
+  const SILENT = (() => {
+    const frames = SR / 2, data = new Int16Array(frames * 2);
+    let s = 0x1234567;
+    for (let i = 0; i < data.length; i++) { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; data[i] = (s & 3) - 1; }
+    const bytes = new Uint8Array(44 + data.byteLength);
+    bytes.set(new Uint8Array(wavHeader(frames, SR)), 0);
+    bytes.set(new Uint8Array(data.buffer), 44);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return { blobUrl: URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' })), dataUrl: 'data:audio/wav;base64,' + btoa(bin) };
+  })();
+
+  /* ---------- Rendering (worker first, main thread as a fallback) ---------- */
+  let workerUrl = null, workerOk = typeof Worker !== 'undefined';
+  const WORKER_TAIL = '\nself.onmessage = function (e) {\n  var p = e.data;\n  try {\n    var frames = Math.round(p.t1 * p.sr) - Math.round(p.t0 * p.sr);\n    var parts = [wavHeader(frames, p.sr)];\n    for (var ch of synthGen(p)) { parts.push(new Blob([ch.data])); self.postMessage({ type: "progress", done: ch.done, total: ch.total }); }\n    self.postMessage({ type: "done", blob: new Blob(parts, { type: "audio/wav" }) });\n  } catch (err) { self.postMessage({ type: "error", message: String((err && err.message) || err) }); }\n};\n';
+  function getWorkerUrl() {
+    if (!workerUrl) {
+      const src = [makeBedTile, synthGen, wavHeader].map(f => f.toString()).join('\n') + WORKER_TAIL;
+      workerUrl = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+    }
+    return workerUrl;
+  }
+
+  function requestRender(t0) {
+    if (M.mode === 'webaudio') return null;
+    const p = sessionParams(t0), key = keyOf(p);
+    if (R.ready && R.ready.key === key) { const r = R.ready; Promise.resolve().then(() => onRenderReady(r)); return key; }
+    if (R.job && R.job.key === key) return key;
+    cancelJob();
+    const job = { key, p, progress: 0, cancelled: false, worker: null };
+    R.job = job;
+    startJob(job);
+    renderStatus();
+    return key;
+  }
+  function cancelJob() {
+    const job = R.job;
+    if (!job) return;
+    job.cancelled = true;
+    if (job.worker) { try { job.worker.terminate(); } catch (e) { /* already gone */ } }
+    R.job = null;
+  }
+  function startJob(job) {
+    if (workerOk) {
+      try {
+        const w = new Worker(getWorkerUrl());
+        job.worker = w;
+        w.onmessage = e => {
+          const m = e.data;
+          if (job.cancelled) return;
+          if (m.type === 'progress') { job.progress = m.done / m.total; renderStatus(); }
+          else if (m.type === 'done') { w.terminate(); finishJob(job, m.blob); }
+          else if (m.type === 'error') { w.terminate(); failJob(job, m.message); }
+        };
+        w.onerror = ev => {
+          if (ev && ev.preventDefault) ev.preventDefault();
+          try { w.terminate(); } catch (e) { /* ignore */ }
+          if (job.cancelled) return;
+          if (job.progress === 0) { workerOk = false; job.worker = null; runOnMain(job); }
+          else failJob(job, 'render error');
+        };
+        w.postMessage(job.p);
+        return;
+      } catch (e) { workerOk = false; }
+    }
+    runOnMain(job);
+  }
+  async function runOnMain(job) {
+    try {
+      const p = job.p, frames = Math.round(p.t1 * p.sr) - Math.round(p.t0 * p.sr);
+      const parts = [wavHeader(frames, p.sr)];
+      for (const ch of synthGen(p)) {
+        if (job.cancelled) return;
+        parts.push(new Blob([ch.data]));
+        job.progress = ch.done / ch.total;
+        renderStatus();
+        await new Promise(r => setTimeout(r, 0));
+      }
+      if (!job.cancelled) finishJob(job, new Blob(parts, { type: 'audio/wav' }));
+    } catch (e) { if (!job.cancelled) failJob(job, e && e.message); }
+  }
+  function finishJob(job, blob) {
+    if (R.job === job) R.job = null;
+    const r = { key: job.key, p: job.p, t0: job.p.t0, blob, url: URL.createObjectURL(blob), dataUrl: null };
+    const old = R.ready;
+    R.ready = r;
+    if (old && old !== M.active) URL.revokeObjectURL(old.url);
+    if (M.mode === 'data') { renderStatus(); toDataUrl(r).then(() => onRenderReady(r)).catch(() => onRenderReady(r)); return; }
+    onRenderReady(r);
+  }
+  function failJob(job, msg) {
+    if (R.job === job) R.job = null;
+    M.startKey = null; M.applyKey = null; M.applying = false;
+    M.error = 'This device couldn’t prepare that session. Try a shorter one.';
+    if (M.state === 'preparing') setState('idle');
+    renderStatus();
+    if (window.console) console.warn('Render failed:', msg);
+  }
+  function onRenderReady(r) {
+    if (R.ready !== r) return;
+    M.error = '';
+    if (M.startKey && r.key === M.startKey && M.state === 'preparing') { M.startKey = null; loadAndPlay(r); return; }
+    if (M.applyKey && r.key === M.applyKey && (M.state === 'playing' || M.state === 'paused')) {
+      M.applyKey = null; M.applying = false;
+      switchTo(r, M.state === 'playing');
+      return;
+    }
+    renderStatus();
+  }
+
+  /* ---------- Element playback ---------- */
+  function setAudioSessionPlayback() {
+    try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) { /* not supported */ }
+  }
+  function srcFor(r) { return M.mode === 'data' && r.dataUrl ? r.dataUrl : r.url; }
+  function setActive(r) {
+    const old = M.active;
+    M.active = r;
+    if (old && old !== r && old !== R.ready) URL.revokeObjectURL(old.url);
+  }
+  function primeElement() {
+    player.loop = true;
+    player.src = M.mode === 'data' ? SILENT.dataUrl : SILENT.blobUrl;
+    const pr = player.play();
+    if (pr && pr.catch) pr.catch(() => { /* the real start reports errors */ });
+  }
+  function loadAndPlay(r) {
+    if (M.mode === 'data' && !r.dataUrl) { toDataUrl(r).then(() => loadAndPlay(r)).catch(() => escalate(r, M.attempt)); return; }
+    setActive(r);
+    const attempt = ++M.attempt;
+    M.switching = true;
+    player.loop = false;
+    player.src = srcFor(r);
+    updateMediaSession();
+    setState('playing');
+    const pr = player.play();
+    if (pr && pr.then) pr.then(() => { if (attempt === M.attempt) M.switching = false; onElementStarted(); }).catch(err => { if (attempt === M.attempt) M.switching = false; handlePlayError(err, r, attempt); });
+    else M.switching = false;
+  }
+  function switchTo(r, play) {
+    setActive(r);
+    const attempt = ++M.attempt;
+    M.switching = true;
+    player.loop = false;
+    player.src = srcFor(r);
+    updateMediaSession();
+    if (play) {
+      const pr = player.play();
+      if (pr && pr.then) pr.then(() => { if (attempt === M.attempt) M.switching = false; }).catch(err => { if (attempt === M.attempt) M.switching = false; handlePlayError(err, r, attempt); });
+      else M.switching = false;
+    } else {
+      M.switching = false;
+    }
+    renderStatus();
+  }
+  function handlePlayError(err, r, attempt) {
+    const name = err && err.name;
+    if (name === 'AbortError') return;
+    if (attempt !== M.attempt) return;
+    if (name === 'NotAllowedError') { setState('paused'); M.hint = 'Tap play to start.'; renderStatus(); return; }
+    escalate(r, attempt);
+  }
+  function escalate(r, attempt) {
+    if (attempt !== undefined && M.escalated === attempt) return;
+    M.escalated = attempt;
+    if (M.mode === 'blob') {
+      M.mode = 'data';
+      renderDiag();
+      toDataUrl(r).then(() => loadAndPlay(r)).catch(() => escalate(r, -1));
+      return;
+    }
+    M.mode = 'webaudio';
+    cancelJob();
+    renderDiag();
+    M.switching = true;
+    player.pause();
+    player.removeAttribute('src');
+    try { player.load(); } catch (e) { /* ignore */ }
+    M.switching = false;
+    M.active = null;
+    setState('idle');
+    showNotice('Lock-screen playback isn’t available in this view. Tap play to use backup audio, and keep the screen on.');
+  }
+  function toDataUrl(r) {
+    if (r.dataUrl) return Promise.resolve(r.dataUrl);
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => { r.dataUrl = fr.result; resolve(r.dataUrl); };
+      fr.onerror = () => reject(fr.error);
+      fr.readAsDataURL(r.blob);
+    });
+  }
+  function onElementStarted() {
+    if (M.probe !== 'ok') { M.probe = 'ok'; renderDiag(); }
+  }
+
+  player.addEventListener('playing', () => {
+    if (!M.active || player.loop) return;
+    if (M.state !== 'playing') setState('playing');
+  });
+  player.addEventListener('pause', () => {
+    if (M.switching || player.loop || !M.active || player.ended) return;
+    if (M.state === 'playing') setState('paused');
+  });
+  player.addEventListener('ended', () => {
+    if (!M.active || player.loop) return;
+    setState('ended');
+  });
+  player.addEventListener('error', () => {
+    if (!M.active || player.loop || M.mode === 'webaudio') return;
+    const code = player.error && player.error.code;
+    if (code === 4 || code === 2) escalate(M.active, M.attempt);
+  });
+
+  /* ---------- Probe which media sources this page may load ---------- */
+  const blocked = { blob: false, data: false };
+  document.addEventListener('securitypolicyviolation', e => {
+    const dir = String(e.violatedDirective || e.effectiveDirective || '');
+    if (!/media-src|default-src/.test(dir)) return;
+    const uri = String(e.blockedURI || '');
+    if (uri.startsWith('blob')) blocked.blob = true;
+    if (uri.startsWith('data')) blocked.data = true;
+    if (blocked.blob && M.mode === 'blob' && M.state === 'idle') { M.mode = blocked.data ? 'webaudio' : 'data'; if (M.mode === 'webaudio') cancelJob(); renderDiag(); renderStatus(); }
+  });
+  function probeOne(url) {
+    return new Promise(resolve => {
+      const a = document.createElement('audio');
+      let done = false;
+      const fin = v => { if (done) return; done = true; clearTimeout(timer); a.removeAttribute('src'); try { a.load(); } catch (e) { /* ignore */ } resolve(v); };
+      const timer = setTimeout(() => fin('unknown'), 4000);
+      a.muted = true; a.preload = 'auto';
+      a.addEventListener('loadedmetadata', () => fin('ok'));
+      a.addEventListener('error', () => fin('error'));
+      a.src = url;
+      try { a.load(); } catch (e) { fin('error'); }
+    });
+  }
+  async function probeMedia() {
+    const b = await probeOne(SILENT.blobUrl);
+    if (b === 'ok' && !blocked.blob) { M.probe = 'ok'; renderDiag(); return; }
+    if (b === 'unknown' && !blocked.blob) { M.probe = 'unknown'; renderDiag(); return; }
+    const d = await probeOne(SILENT.dataUrl);
+    if (M.state !== 'idle') return;
+    if (d === 'ok' && !blocked.data) { M.mode = 'data'; M.probe = 'ok'; }
+    else if (d === 'unknown' && !blocked.data) { M.mode = 'data'; M.probe = 'unknown'; }
+    else { M.mode = 'webaudio'; M.probe = 'ok'; cancelJob(); showNotice('Lock-screen playback isn’t available in this view. Keep the screen on while you listen.'); }
+    renderDiag();
+    renderStatus();
+  }
+
+  /* ---------- Web Audio backup (screen on only) ---------- */
+  const WA = { ctx: null, nodes: [], startAt: 0, t0: 0, p: null, running: false };
+  function waContext() {
+    if (!WA.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      try { WA.ctx = new AC(); } catch (e) { return null; }
+    }
+    if (WA.ctx.state === 'suspended') WA.ctx.resume().catch(() => {});
+    return WA.ctx;
+  }
+  function waStop() {
+    WA.nodes.forEach(n => { try { if (n.stop) n.stop(); } catch (e) { /* not started */ } try { n.disconnect(); } catch (e) { /* ignore */ } });
+    WA.nodes = [];
+    WA.running = false;
+  }
+  function waStart(t0) {
+    const ctx = waContext();
+    if (!ctx) { showNotice('This browser can’t play audio here.'); setState('idle'); return; }
+    waStop();
+    const p = sessionParams(t0), now = ctx.currentTime + 0.06, D = p.dur, left = D - t0;
+    const master = ctx.createGain();
+    const fi = t0 > 0 ? p.entryFade : p.fadeIn, foStart = Math.max(t0 + fi, D - p.fadeOut);
+    master.gain.setValueAtTime(0, now);
+    master.gain.linearRampToValueAtTime(1, now + fi);
+    master.gain.setValueAtTime(1, now + (foStart - t0));
+    master.gain.linearRampToValueAtTime(0, now + left);
+    master.connect(ctx.destination);
+    const merger = ctx.createChannelMerger(2); merger.connect(master);
+    const oL = ctx.createOscillator(), oR = ctx.createOscillator(), gL = ctx.createGain(), gR = ctx.createGain();
+    gL.gain.value = p.toneAmp; gR.gain.value = p.toneAmp;
+    oL.connect(gL); oR.connect(gR); gL.connect(merger, 0, 0); gR.connect(merger, 0, 1);
+    const c = p.carrier;
+    if (p.glide && t0 < p.glideDur) {
+      const K = 96, T = p.glideDur - t0, cl = new Float32Array(K + 1), cr = new Float32Array(K + 1);
+      for (let k = 0; k <= K; k++) { const bt = beatAtT(t0 + T * k / K, p); cl[k] = c - bt / 2; cr[k] = c + bt / 2; }
+      oL.frequency.setValueCurveAtTime(cl, now, T); oR.frequency.setValueCurveAtTime(cr, now, T);
+    } else { oL.frequency.setValueAtTime(c - p.beat / 2, now); oR.frequency.setValueAtTime(c + p.beat / 2, now); }
+    oL.start(now); oR.start(now); oL.stop(now + left + 0.1); oR.stop(now + left + 0.1);
+    WA.nodes.push(oL, oR, gL, gR, merger, master);
+    if (p.bed !== 'off') {
+      const tile = makeBedTile(p.bed, SR, 20, p.seed);
+      const buf = ctx.createBuffer(2, tile.length, SR), bl = buf.getChannelData(0), br = buf.getChannelData(1), half = tile.length >> 1;
+      for (let i = 0; i < tile.length; i++) { bl[i] = tile[i]; br[i] = tile[(i + half) % tile.length]; }
+      const srcN = ctx.createBufferSource(); srcN.buffer = buf; srcN.loop = true;
+      const bg = ctx.createGain(); bg.gain.value = p.bedLevel * p.bedMax;
+      let node = srcN;
+      if (p.bed === 'surf') {
+        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; srcN.connect(lp); node = lp;
+        const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 0.11; lg.gain.value = 0.5 * bg.gain.value;
+        lfo.connect(lg); lg.connect(bg.gain); lfo.start(now); WA.nodes.push(lfo, lg, lp);
+      }
+      node.connect(bg); bg.connect(master); srcN.start(now);
+      WA.nodes.push(srcN, bg);
+    }
+    WA.startAt = now; WA.t0 = t0; WA.p = p; WA.running = true;
+    setState('playing');
+  }
+  const waTime = () => WA.running && WA.ctx ? WA.t0 + Math.max(0, WA.ctx.currentTime - WA.startAt) : WA.t0;
+
+  /* ---------- Transport ---------- */
+  function sessionTime() {
+    if (M.mode === 'webaudio') return waTime();
+    if (!M.active) return 0;
+    return M.active.t0 + (player.loop ? 0 : (player.currentTime || 0));
+  }
+  function currentParams() {
+    if (M.mode === 'webaudio' && WA.p && (M.state === 'playing' || M.state === 'paused')) return WA.p;
+    if (M.active && M.state !== 'idle' && M.state !== 'ended') return M.active.p;
+    return sessionParams(0);
+  }
+
+  function onPlayTap() {
+    hideNoticeIfTransient();
+    if (M.state === 'playing') { pause(); return; }
+    if (M.state === 'paused') { resume(); return; }
+    if (M.state === 'preparing') { stop(); return; }
+    startSession();
+  }
+  function startSession() {
+    M.error = ''; M.hint = '';
+    setAudioSessionPlayback();
+    if (M.mode === 'webaudio') { waStart(0); return; }
+    const key = keyOf(sessionParams(0));
+    if (R.ready && R.ready.key === key && (M.mode !== 'data' || R.ready.dataUrl)) { loadAndPlay(R.ready); return; }
+    // Not rendered yet: unlock the element inside this tap, then start when the render lands.
+    primeElement();
+    M.startKey = key;
+    setState('preparing');
+    requestRender(0);
+  }
+  function pause() {
+    if (M.mode === 'webaudio') { if (WA.ctx) WA.ctx.suspend(); setState('paused'); return; }
+    player.pause();
+    setState('paused');
+  }
+  function resume() {
+    M.hint = '';
+    setAudioSessionPlayback();
+    if (M.mode === 'webaudio') { if (WA.running && WA.ctx) { WA.ctx.resume(); setState('playing'); } else waStart(WA.t0 || 0); return; }
+    if (!M.active) { startSession(); return; }
+    const pr = player.play();
+    setState('playing');
+    if (pr && pr.catch) pr.catch(err => handlePlayError(err, M.active));
+  }
+  function stop() {
+    cancelJob();
+    clearTimeout(applyTimer);
+    M.startKey = null; M.applyKey = null; M.applying = false; M.hint = '';
+    M.attempt++;
+    if (M.mode === 'webaudio') { waStop(); WA.t0 = 0; if (WA.ctx) WA.ctx.resume().catch(() => {}); }
+    M.switching = true;
+    player.pause();
+    player.loop = false;
+    player.removeAttribute('src');
+    try { player.load(); } catch (e) { /* ignore */ }
+    M.switching = false;
+    const old = M.active;
+    M.active = null;
+    if (old && old !== R.ready) URL.revokeObjectURL(old.url);
+    app.dataset.adjust = '0';
+    setState('idle');
+    schedulePrerender(400);
+  }
+
+  let prerenderTimer = 0, applyTimer = 0;
+  function schedulePrerender(ms) {
+    clearTimeout(prerenderTimer);
+    prerenderTimer = setTimeout(() => { if (M.state === 'idle' || M.state === 'ended') requestRender(0); }, ms);
+  }
+  function onParamsChanged() {
+    saveSettings();
+    renderControls();
+    if (M.state === 'idle' || M.state === 'ended') {
+      if (M.state === 'ended') setState('idle');
+      if (R.job && R.job.p.t0 === 0) cancelJob();
+      schedulePrerender(650);
+      renderStatus();
+      return;
+    }
+    if (M.state === 'preparing') {
+      cancelJob();
+      M.startKey = null;
+      clearTimeout(applyTimer);
+      applyTimer = setTimeout(() => { if (M.state === 'preparing') M.startKey = requestRender(0); }, 500);
+      renderStatus();
+      return;
+    }
+    // Mid-session: re-render the rest of the session from where it is now.
+    clearTimeout(applyTimer);
+    M.applying = true;
+    renderStatus();
+    applyTimer = setTimeout(() => {
+      if (M.state !== 'playing' && M.state !== 'paused') { M.applying = false; return; }
+      if (M.mode === 'webaudio') {
+        const t = waTime(); M.applying = false;
+        if (M.state === 'playing') waStart(t);
+        else { WA.t0 = t; WA.p = sessionParams(t); WA.running = false; renderStatus(); }
+        return;
+      }
+      const t = Math.max(0.05, sessionTime());
+      if (t >= S.minutes * 60 - 2) { M.applying = false; renderStatus(); return; }
+      M.applyKey = requestRender(Math.round(t * 100) / 100);
+    }, 700);
+  }
+
+  /* ---------- Lock screen / media keys ---------- */
+  let artUrl = '';
+  function makeArtwork() {
+    try {
+      const c = document.createElement('canvas'); c.width = c.height = 512;
+      const g = c.getContext('2d');
+      g.fillStyle = '#05060b'; g.fillRect(0, 0, 512, 512);
+      const grd = g.createRadialGradient(256, 256, 10, 256, 256, 250);
+      grd.addColorStop(0, 'rgba(244,236,255,0.22)'); grd.addColorStop(1, 'rgba(5,6,11,0)');
+      g.fillStyle = grd; g.fillRect(0, 0, 512, 512);
+      g.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < 9; k++) {
+        const phi = k * 0.35, r = 200 - k * 17;
+        g.beginPath();
+        for (let i = 0; i <= 240; i++) {
+          const th = i / 240 * Math.PI * 2, x = Math.sin(th), y = Math.sin(th + phi);
+          const a = Math.PI / 4, px = 256 + (Math.cos(a) * x - Math.sin(a) * y) * r, py = 256 + (Math.sin(a) * x + Math.cos(a) * y) * r;
+          if (i) g.lineTo(px, py); else g.moveTo(px, py);
+        }
+        g.strokeStyle = k % 2 ? 'rgba(255,185,149,0.55)' : 'rgba(143,214,255,0.55)';
+        g.lineWidth = 2.2; g.stroke();
+      }
+      artUrl = c.toDataURL('image/png');
+    } catch (e) { artUrl = ''; }
+  }
+  function updateMediaSession() {
+    if (!('mediaSession' in navigator)) return;
+    const p = currentParams(), [band] = bandOf(p.beat);
+    try {
+      const meta = { title: band + ' ' + fmtBeat(p.beat) + ' Hz', artist: 'Threshold', album: S.minutes + ' min session' };
+      if (artUrl) meta.artwork = [{ src: artUrl, sizes: '512x512', type: 'image/png' }];
+      navigator.mediaSession.metadata = new MediaMetadata(meta);
+    } catch (e) { /* unsupported */ }
+  }
+  function updatePosition() {
+    if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState) return;
+    if (M.mode === 'webaudio' || !M.active || player.loop) return;
+    const D = M.active.p.dur, pos = clamp(sessionTime(), 0, D);
+    try { navigator.mediaSession.setPositionState({ duration: D, playbackRate: 1, position: pos }); } catch (e) { /* ignore */ }
+  }
+  function bindMediaSession() {
+    if (!('mediaSession' in navigator)) return;
+    const set = (a, f) => { try { navigator.mediaSession.setActionHandler(a, f); } catch (e) { /* unsupported action */ } };
+    set('play', () => { if (M.state === 'paused') resume(); else if (M.state === 'idle' || M.state === 'ended') startSession(); });
+    set('pause', () => { if (M.state === 'playing') pause(); });
+    set('stop', () => stop());
+    set('seekto', d => {
+      if (!M.active || player.loop || !d || typeof d.seekTime !== 'number') return;
+      player.currentTime = clamp(d.seekTime - M.active.t0, 0, Math.max(0, (player.duration || 1) - 0.5));
+      updatePosition();
+    });
+    ['seekbackward', 'seekforward', 'previoustrack', 'nexttrack'].forEach(a => set(a, null));
+  }
+
+  /* ---------- UI ---------- */
+  function setState(s) {
+    const prev = M.state;
+    M.state = s;
+    app.dataset.state = s;
+    if (s === 'idle' || s === 'ended') app.dataset.adjust = '0';
+    el.adjustBtn.hidden = !(s === 'playing' || s === 'paused');
+    el.stopBtn.hidden = !(s === 'playing' || s === 'paused' || s === 'preparing');
+    el.adjustBtn.setAttribute('aria-expanded', app.dataset.adjust === '1' ? 'true' : 'false');
+    el.adjustBtn.textContent = app.dataset.adjust === '1' ? 'Done' : 'Adjust';
+    el.playBtn.setAttribute('aria-label', s === 'playing' ? 'Pause session' : s === 'paused' ? 'Resume session' : s === 'preparing' ? 'Cancel' : 'Start session');
+    if ('mediaSession' in navigator) {
+      try { navigator.mediaSession.playbackState = s === 'playing' ? 'playing' : s === 'paused' ? 'paused' : 'none'; } catch (e) { /* ignore */ }
+    }
+    if (s === 'ended' && prev !== 'ended') {
+      el.live.textContent = 'Session complete.';
+      setTimeout(() => {
+        if (M.state !== 'ended') return;
+        const old = M.active;
+        M.active = null;
+        if (old && old !== R.ready) URL.revokeObjectURL(old.url);
+        schedulePrerender(0);
+        renderStatus();
+      }, 1500);
+    } else if (s !== prev) {
+      el.live.textContent = s === 'playing' ? 'Playing.' : s === 'paused' ? 'Paused.' : s === 'preparing' ? 'Preparing session.' : '';
+    }
+    renderStatus();
+    layoutGate();
+  }
+
+  function renderStatus() {
+    const D = S.minutes * 60;
+    let main = '', sub = '';
+    const job = R.job;
+    if (M.state === 'preparing') {
+      const pct = job ? Math.round(job.progress * 100) : 0;
+      main = 'Preparing · ' + pct + '%';
+      sub = 'Keep the screen on until it starts.';
+    } else if (M.state === 'playing' || M.state === 'paused') {
+      const p = currentParams(), left = p.dur - sessionTime();
+      main = (M.state === 'paused' ? 'Paused · ' : '') + fmtClock(left) + ' left';
+      sub = M.hint ? M.hint :
+        M.applying || (job && job.p.t0 > 0) ? 'Applying your change…' :
+        M.mode === 'webaudio' ? 'Backup audio. Keep the screen on.' :
+        M.state === 'paused' ? 'Resume here or from the lock screen.' : 'You can lock your phone now.';
+    } else if (M.state === 'ended') {
+      main = 'Session complete';
+      sub = 'Rest a moment before you get up.';
+    } else {
+      main = S.minutes + ' min · ' + (job && job.p.t0 === 0 ? 'preparing ' + Math.round(job.progress * 100) + '%' : 'ready');
+      sub = M.error || (M.mode === 'webaudio' ? 'Backup audio. Keep the screen on.' : 'Headphones on. Press play, then lock your phone.');
+    }
+    if (el.statusMain.textContent !== main) el.statusMain.textContent = main;
+    if (el.statusSub.textContent !== sub) el.statusSub.textContent = sub;
+    let frac = 0;
+    if (M.state === 'preparing') frac = job ? job.progress : 1;
+    else if (M.state === 'playing' || M.state === 'paused') frac = clamp(sessionTime() / currentParams().dur, 0, 1);
+    else if (M.state === 'ended') frac = 1;
+    el.ringProg.style.strokeDashoffset = String(RING_LEN * (1 - frac));
+  }
+
+  function renderControls() {
+    el.beatRange.value = String(toSlider(S.beat));
+    el.beatRange.setAttribute('aria-valuetext', fmtBeat(S.beat) + ' hertz');
+    el.beatOut.textContent = fmtBeat(S.beat) + ' Hz';
+    presets.forEach(b => b.setAttribute('aria-pressed', Math.abs(parseFloat(b.dataset.beat) - S.beat) < 0.05 ? 'true' : 'false'));
+    el.lenSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-checked', String(+b.dataset.min === S.minutes)));
+    el.bedSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.bed === S.bed)));
+    el.carrierRange.value = String(S.carrier);
+    el.carrierRange.setAttribute('aria-valuetext', S.carrier + ' hertz');
+    el.carrierOut.textContent = S.carrier + ' Hz';
+    el.levelRange.value = String(Math.round(S.bedLevel * 100));
+    el.levelRange.setAttribute('aria-valuetext', Math.round(S.bedLevel * 100) + ' percent');
+    el.levelOut.textContent = Math.round(S.bedLevel * 100) + '%';
+    el.levelRow.hidden = S.bed === 'off';
+    const canGlide = S.beat < CFG.glideFrom - 0.5;
+    el.glideToggle.checked = S.glide;
+    el.glideToggle.disabled = !canGlide;
+    el.glideRow.classList.toggle('is-off', !canGlide);
+    const gMin = Math.round(glideDur(S.minutes * 60) / 60);
+    el.glideSub.textContent = canGlide ? 'Starts at alpha and eases down over the first ' + gMin + ' min' : 'Only for beats below 9.5 Hz';
+    el.moreSum.textContent = carrierFor(S.carrier, S.beat) + ' Hz tone · ' + (S.bed === 'off' ? 'no bed' : S.bed) + (glideOn() ? ' · glide' : '');
+    renderReadout(true);
+  }
+
+  let lastReadout = '';
+  function renderReadout(force) {
+    const p = currentParams();
+    const live = M.state === 'playing' || M.state === 'paused';
+    const t = live ? sessionTime() : 0;
+    const bt = live ? beatAtT(t, p) : p.beat;
+    const c = p.carrier;
+    const [band, note] = bandOf(bt);
+    const fl = (c - bt / 2).toFixed(2), fr = (c + bt / 2).toFixed(2);
+    let glideTxt = '';
+    if (live && p.glide && p.glideFrom > p.beat && t < p.glideDur) glideTxt = 'gliding to ' + fmtBeat(p.beat) + ' Hz · ' + fmtClock(p.glideDur - t);
+    else if (!live && p.glide && p.glideFrom > p.beat) glideTxt = 'glides in from 10 Hz';
+    const sig = [band, fmtBeat(bt), fl, fr, glideTxt].join('|');
+    if (!force && sig === lastReadout) return;
+    lastReadout = sig;
+    el.bandName.textContent = band;
+    el.bandNote.textContent = note;
+    el.beatNow.textContent = fmtBeat(bt);
+    el.fL.textContent = fl;
+    el.fR.textContent = fr;
+    el.glideNow.hidden = !glideTxt;
+    el.glideNow.textContent = glideTxt;
+  }
+
+  let noticeTransient = false;
+  function showNotice(text, transient) {
+    el.noticeText.textContent = text;
+    el.notice.hidden = false;
+    noticeTransient = !!transient;
+    layoutGate();
+  }
+  function hideNoticeIfTransient() { if (noticeTransient) { el.notice.hidden = true; noticeTransient = false; layoutGate(); } }
+
+  function renderDiag() {
+    const label = M.mode === 'webaudio' ? 'Web Audio backup (keep the screen on)' : 'media element, ' + (M.mode === 'data' ? 'inline data' : 'generated file') + ' (lock-screen safe)';
+    el.diag.textContent = 'Playback: ' + label + (M.probe === 'unknown' ? ', confirmed on first play' : '') + ' · ' + SR / 1000 + ' kHz stereo';
+  }
+
+  /* ---------- Bindings ---------- */
+  el.playBtn.addEventListener('click', onPlayTap);
+  el.stopBtn.addEventListener('click', stop);
+  el.adjustBtn.addEventListener('click', () => {
+    app.dataset.adjust = app.dataset.adjust === '1' ? '0' : '1';
+    el.adjustBtn.setAttribute('aria-expanded', app.dataset.adjust === '1' ? 'true' : 'false');
+    el.adjustBtn.textContent = app.dataset.adjust === '1' ? 'Done' : 'Adjust';
+    layoutGate();
+  });
+  presets.forEach(b => b.addEventListener('click', () => { S.beat = parseFloat(b.dataset.beat); onParamsChanged(); }));
+  el.beatRange.addEventListener('input', () => { S.beat = fromSlider(+el.beatRange.value); renderControls(); });
+  el.beatRange.addEventListener('change', () => { S.beat = fromSlider(+el.beatRange.value); onParamsChanged(); });
+  el.beatDown.addEventListener('click', () => { S.beat = clamp(Math.round((S.beat - 0.1) * 10) / 10, 0.5, 40); onParamsChanged(); });
+  el.beatUp.addEventListener('click', () => { S.beat = clamp(Math.round((S.beat + 0.1) * 10) / 10, 0.5, 40); onParamsChanged(); });
+  el.lenSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.minutes = +b.dataset.min; onParamsChanged(); });
+  el.bedSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.bed = b.dataset.bed; onParamsChanged(); });
+  [el.lenSeg, el.bedSeg].forEach(seg => seg.addEventListener('keydown', e => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+    const btns = Array.from(seg.querySelectorAll('button')), i = btns.findIndex(b => b.getAttribute('aria-checked') === 'true');
+    const n = btns[(i + (e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1) + btns.length) % btns.length];
+    e.preventDefault(); n.focus(); n.click();
+  }));
+  el.carrierRange.addEventListener('input', () => { S.carrier = +el.carrierRange.value; renderControls(); });
+  el.carrierRange.addEventListener('change', () => { S.carrier = +el.carrierRange.value; onParamsChanged(); });
+  el.levelRange.addEventListener('input', () => { S.bedLevel = +el.levelRange.value / 100; renderControls(); });
+  el.levelRange.addEventListener('change', () => { S.bedLevel = +el.levelRange.value / 100; onParamsChanged(); });
+  el.glideToggle.addEventListener('change', () => { S.glide = el.glideToggle.checked; onParamsChanged(); });
+  $('more').addEventListener('toggle', () => layoutGate());
+  el.noticeClose.addEventListener('click', () => { el.notice.hidden = true; layoutGate(); });
+
+  let lastFocus = null;
+  function openSheet() { lastFocus = document.activeElement; el.sheet.hidden = false; renderDiag(); el.sheet.querySelector('.sheet').scrollTop = 0; el.sheetClose.focus({ preventScroll: true }); }
+  function closeSheet() { el.sheet.hidden = true; if (lastFocus && lastFocus.focus) lastFocus.focus(); }
+  el.infoBtn.addEventListener('click', openSheet);
+  el.sheetClose.addEventListener('click', closeSheet);
+  el.sheet.addEventListener('click', e => { if (e.target === el.sheet) closeSheet(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !el.sheet.hidden) { closeSheet(); return; }
+    if (e.code === 'Space' && el.sheet.hidden) {
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'BUTTON' || t.tagName === 'SUMMARY')) return;
+      e.preventDefault(); onPlayTap();
+    }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    if (M.state === 'playing' && M.mode !== 'webaudio' && M.active) {
+      if (player.ended) setState('ended');
+      else if (player.paused && !M.switching) setState('paused');
+    }
+    renderStatus(); renderReadout(true); layoutGate();
+  });
+
+  // Heads-up when the page sits inside an app's built-in web view.
+  (function detectEmbeddedView() {
+    const ua = navigator.userAgent || '';
+    const iOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const inAppIOS = iOS && !/Safari\//.test(ua) && !navigator.standalone;
+    const inAppAndroid = /Android/.test(ua) && /;\s?wv\)/.test(ua);
+    if (inAppIOS || inAppAndroid) showNotice('If the sound stops when you lock your phone, open this page in ' + (iOS ? 'Safari' : 'Chrome') + '.');
+  })();
+
+  /* ---------- Visual: Lissajous phase tunnel ---------- */
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let scene = null;
+  let gateTarget = 0.5, gateNow = 0.5, crowded = false;
+  function layoutGate() {
+    const h = window.innerHeight || 1;
+    const top = el.readout.getBoundingClientRect().bottom;
+    const bottom = el.deck.getBoundingClientRect().top;
+    // Keep the gate clear of the readout; when the deck is tall it settles behind the deck instead.
+    const mid = Math.max((top + bottom) / 2, top + 150);
+    gateTarget = clamp(mid / h, 0.22, 0.82);
+    crowded = bottom - top < 300;
+  }
+  function hexToVec(hex) {
+    const v = hex.trim().replace('#', '');
+    const n = parseInt(v.length === 3 ? v.split('').map(x => x + x).join('') : v, 16);
+    return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255];
+  }
+  function initScene() {
+    if (!window.THREE) return null;
+    const THREE = window.THREE;
+    const canvas = $('scene');
+    let renderer;
+    try { renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true, powerPreference: 'low-power' }); }
+    catch (e) { return null; }
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    renderer.setClearColor(0x000000, 0);
+    const sceneObj = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 200);
+    camera.position.set(0, 0, 6);
+    const css = getComputedStyle(document.documentElement);
+    const colL = hexToVec(css.getPropertyValue('--left') || '#8fd6ff');
+    const colR = hexToVec(css.getPropertyValue('--right') || '#ffb995');
+    const colG = hexToVec(css.getPropertyValue('--glow') || '#f4ecff');
+
+    const RINGS = 84, PTS = 230, count = RINGS * PTS;
+    const pos = new Float32Array(count * 3), aTheta = new Float32Array(count), aRing = new Float32Array(count), aSeed = new Float32Array(count * 2);
+    let rs = 0x2f6b9a1;
+    const rnd = () => { rs ^= rs << 13; rs ^= rs >>> 17; rs ^= rs << 5; return (rs >>> 0) / 4294967296; };
+    for (let r = 0, k = 0; r < RINGS; r++) {
+      for (let i = 0; i < PTS; i++, k++) {
+        aTheta[k] = (i + rnd() * 0.7) / PTS * Math.PI * 2;
+        aRing[k] = r;
+        aSeed[k * 2] = rnd(); aSeed[k * 2 + 1] = rnd();
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('aTheta', new THREE.BufferAttribute(aTheta, 1));
+    geo.setAttribute('aRing', new THREE.BufferAttribute(aRing, 1));
+    geo.setAttribute('aSeed', new THREE.BufferAttribute(aSeed, 2));
+    const uniforms = {
+      uTime: { value: 0 }, uFlow: { value: 0 }, uMorph: { value: 0 }, uDensity: { value: 2 },
+      uPulse: { value: 0.5 }, uPulseDepth: { value: 0.15 }, uSize: { value: 2.05 }, uPixelRatio: { value: renderer.getPixelRatio() },
+      uRings: { value: RINGS }, uRadius: { value: 2.5 }, uBright: { value: 0.9 },
+      uColL: { value: new THREE.Vector3(colL[0], colL[1], colL[2]) }, uColR: { value: new THREE.Vector3(colR[0], colR[1], colR[2]) },
+    };
+    const mat = new THREE.ShaderMaterial({
+      uniforms, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+      vertexShader: [
+        'attribute float aTheta; attribute float aRing; attribute vec2 aSeed;',
+        'uniform float uTime, uFlow, uMorph, uDensity, uPulse, uPulseDepth, uSize, uPixelRatio, uRings, uRadius, uBright;',
+        'uniform vec3 uColL, uColR;',
+        'varying vec3 vCol; varying float vA;',
+        'void main() {',
+        '  float d = fract(aRing / uRings + uFlow);',
+        '  float z = mix(-64.0, 4.6, d);',
+        '  float phi = uMorph + (1.0 - d) * uDensity * 6.2831853;',
+        '  float x = sin(aTheta);',
+        '  float y = sin(aTheta + phi);',
+        '  float ang = 0.7853982 + uTime * 0.021 + (1.0 - d) * 1.9;',
+        '  float ca = cos(ang), sa = sin(ang);',
+        '  vec2 p = vec2(ca * x - sa * y, sa * x + ca * y);',
+        '  float r = uRadius * (0.93 + 0.07 * sin(uTime * 0.11 + aRing * 0.37));',
+        '  vec3 pos3 = vec3(p * r + (aSeed - 0.5) * 0.055, z);',
+        '  vec4 mv = modelViewMatrix * vec4(pos3, 1.0);',
+        '  gl_Position = projectionMatrix * mv;',
+        '  float dist = max(0.6, -mv.z);',
+        '  gl_PointSize = uSize * uPixelRatio * (5.5 / dist + 0.38);',
+        '  float farFade = smoothstep(0.0, 0.24, d);',
+        '  float nearFade = 1.0 - smoothstep(0.78, 0.98, d);',
+        '  float side = abs(y) - abs(x);',
+        '  vCol = mix(uColL, uColR, smoothstep(-0.55, 0.55, side));',
+        '  float sparkle = 0.8 + 0.2 * sin(aSeed.x * 40.0 + uTime * (0.5 + aSeed.y));',
+        '  vA = uBright * farFade * nearFade * sparkle * (1.0 - uPulseDepth + uPulseDepth * uPulse);',
+        '}',
+      ].join('\n'),
+      fragmentShader: [
+        'varying vec3 vCol; varying float vA;',
+        'void main() {',
+        '  vec2 q = gl_PointCoord - 0.5;',
+        '  float a = exp(-dot(q, q) * 20.0);',
+        '  gl_FragColor = vec4(vCol, a * vA);',
+        '}',
+      ].join('\n'),
+    });
+    const points = new THREE.Points(geo, mat);
+    points.frustumCulled = false;
+    sceneObj.add(points);
+
+    // Gate glow at the far end of the tunnel.
+    const gc = document.createElement('canvas'); gc.width = gc.height = 128;
+    const gg = gc.getContext('2d'), grad = gg.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grad.addColorStop(0, 'rgba(255,255,255,1)'); grad.addColorStop(0.25, 'rgba(255,255,255,0.35)'); grad.addColorStop(1, 'rgba(255,255,255,0)');
+    gg.fillStyle = grad; gg.fillRect(0, 0, 128, 128);
+    const glowTex = new THREE.CanvasTexture(gc);
+    const glowMat = new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(colG[0], colG[1], colG[2]), transparent: true, opacity: 0.22, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending });
+    const glow = new THREE.Sprite(glowMat);
+    glow.position.set(0, 0, -58); glow.scale.set(34, 34, 1);
+    sceneObj.add(glow);
+
+    // Sparse dust far out, for depth.
+    const STARS = 320, sp = new Float32Array(STARS * 3);
+    for (let i = 0; i < STARS; i++) {
+      const a = rnd() * Math.PI * 2, rr = 7 + rnd() * 26;
+      sp[i * 3] = Math.cos(a) * rr; sp[i * 3 + 1] = Math.sin(a) * rr; sp[i * 3 + 2] = -70 + rnd() * 74;
+    }
+    const sGeo = new THREE.BufferGeometry(); sGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+    const sMat = new THREE.PointsMaterial({ color: new THREE.Color(colG[0], colG[1], colG[2]), size: 0.07, sizeAttenuation: true, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending });
+    const stars = new THREE.Points(sGeo, sMat);
+    sceneObj.add(stars);
+
+    function resize() {
+      const w = window.innerWidth, h = window.innerHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      uniforms.uPixelRatio.value = renderer.getPixelRatio();
+    }
+    resize();
+    return { THREE, renderer, scene: sceneObj, camera, uniforms, glow, stars, resize };
+  }
+
+  let pointerX = 0, pointerY = 0;
+  window.addEventListener('pointermove', e => {
+    if (e.pointerType !== 'mouse') return;
+    pointerX = (e.clientX / window.innerWidth - 0.5) * 2;
+    pointerY = (e.clientY / window.innerHeight - 0.5) * 2;
+  }, { passive: true });
+
+  let lastFrame = 0, vTime = 0, idleT = 0, density = 2, depthNow = 0.12, brightNow = 0.85;
+  let ctClock = { ct: -1, at: 0 };
+  function visualSessionTime(now) {
+    if (M.mode === 'webaudio') return waTime();
+    if (!M.active || player.loop) return 0;
+    const ct = player.currentTime || 0;
+    if (M.state !== 'playing') return M.active.t0 + ct;
+    if (ct !== ctClock.ct) { ctClock = { ct, at: now }; }
+    return M.active.t0 + ct + Math.min(0.35, (now - ctClock.at) / 1000);
+  }
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = lastFrame ? Math.min(0.1, (now - lastFrame) / 1000) : 0.016;
+    lastFrame = now;
+    const speed = reduceMotion ? 0.35 : 1;
+    vTime += dt * speed;
+    const live = M.state === 'playing' || M.state === 'paused';
+    const p = currentParams();
+    let psi, bt, envV = 1;
+    if (live) {
+      const t = visualSessionTime(now);
+      psi = psiAtT(t, p); bt = beatAtT(t, p);
+      envV = envAtT(t, p, (M.mode === 'webaudio' ? WA.t0 : (M.active ? M.active.t0 : 0)));
+    } else {
+      idleT += dt;
+      psi = 2 * Math.PI * p.beat * idleT; bt = p.beat;
+    }
+    if (!scene) return;
+    const u = scene.uniforms;
+    u.uTime.value = vTime;
+    if (M.state !== 'paused') { u.uFlow.value = (u.uFlow.value + dt * speed / 46) % 1; u.uMorph.value += dt * speed * 0.2; }
+    density += (clamp(bt * 0.32, 0.6, 7.5) - density) * Math.min(1, dt * 1.5);
+    u.uDensity.value = density;
+    const depthTarget = reduceMotion ? 0 : (bt <= 12 ? 0.24 : Math.max(0, 0.24 - (bt - 12) * 0.02)) * (M.state === 'playing' ? 1 : 0.55);
+    depthNow += (depthTarget - depthNow) * Math.min(1, dt * 2);
+    u.uPulseDepth.value = depthNow;
+    u.uPulse.value = 0.5 + 0.5 * Math.cos(psi);
+    const brightTarget = (M.state === 'playing' ? 0.7 + 0.45 * envV : M.state === 'paused' ? 0.7 : 1.05) * (crowded ? 0.5 : 1);
+    brightNow += (brightTarget - brightNow) * Math.min(1, dt * 1.2);
+    u.uBright.value = brightNow;
+    scene.glow.material.opacity = 0.14 + 0.1 * brightNow + 0.16 * depthNow * u.uPulse.value;
+    scene.stars.position.z = ((vTime * 0.6) % 20);
+    gateNow += (gateTarget - gateNow) * Math.min(1, dt * 3);
+    const cam = scene.camera, w = window.innerWidth, h = window.innerHeight;
+    cam.setViewOffset(w, h, 0, (0.5 - gateNow) * h, w, h);
+    cam.position.x = 0.28 * Math.sin(vTime * 0.06) + pointerX * 0.25;
+    cam.position.y = 0.2 * Math.sin(vTime * 0.045) - pointerY * 0.18;
+    cam.lookAt(cam.position.x * 0.3, cam.position.y * 0.3, -40);
+    scene.renderer.render(scene.scene, cam);
+  }
+
+  /* ---------- Boot ---------- */
+  function boot() {
+    renderControls();
+    makeArtwork();
+    bindMediaSession();
+    renderDiag();
+    scene = initScene();
+    if (!scene) $('fallbackGlow').hidden = false;
+    window.addEventListener('resize', () => { if (scene) scene.resize(); layoutGate(); });
+    layoutGate();
+    setState('idle');
+    requestAnimationFrame(frame);
+    setInterval(() => {
+      if (M.state === 'playing' || M.state === 'paused') {
+        if (M.mode === 'webaudio' && M.state === 'playing' && waTime() >= currentParams().dur) { waStop(); setState('ended'); }
+        renderStatus(); renderReadout(false);
+      }
+    }, 250);
+    setInterval(() => { if (M.state === 'playing') updatePosition(); }, 5000);
+    probeMedia();
+    schedulePrerender(900);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutGate);
+  }
+  window.__threshold = { M, R, S, WA, player, sessionTime };
+  boot();
+})();
+</script>
+
+</body></html>
